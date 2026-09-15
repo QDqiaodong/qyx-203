@@ -23,4 +23,10 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
 
     @Query("SELECT t FROM TimeSlot t WHERE t.startTime <= :endTime AND t.endTime >= :startTime")
     List<TimeSlot> findByTimeRange(@Param("startTime") LocalTime startTime, @Param("endTime") LocalTime endTime);
+
+    @Query("SELECT t FROM TimeSlot t, Device d WHERE t.deviceId = d.id " +
+            "AND d.terminalArea = :terminalArea AND d.deviceType = :deviceType AND t.status = :status")
+    List<TimeSlot> findByAreaAndTypeAndStatus(@Param("terminalArea") String terminalArea,
+                                              @Param("deviceType") String deviceType,
+                                              @Param("status") String status);
 }

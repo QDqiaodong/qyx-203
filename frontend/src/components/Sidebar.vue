@@ -8,6 +8,7 @@ const menuItems = [
   { path: '/', label: '首页', icon: 'el-icon-s-home' },
   { path: '/devices', label: '设备管理', icon: 'el-icon-s-tools' },
   { path: '/time-slots', label: '时段绑定', icon: 'el-icon-time' },
+  { path: '/peak-capacity', label: '高峰上限', icon: 'el-icon-data-analysis' },
   { path: '/change-logs', label: '变更记录', icon: 'el-icon-document' },
   { path: '/statistics', label: '统计分析', icon: 'el-icon-data-line' },
 ]

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Device, TimeSlot, ChangeLog, PageResponse, ApiResponse } from '@/types'
+import type { Device, TimeSlot, ChangeLog, PeakWindow, PeakCapacityLimit, PageResponse, ApiResponse } from '@/types'
 
 const instance = axios.create({
   baseURL: '/api',
@@ -66,5 +66,23 @@ export const categoryApi = {
   },
   getTerminalAreas() {
     return instance.get<ApiResponse<string[]>>('/categories/terminal-areas')
+  }
+}
+
+export const peakCapacityApi = {
+  windows() {
+    return instance.get<ApiResponse<PeakWindow[]>>('/peak-capacity/windows')
+  },
+  list() {
+    return instance.get<ApiResponse<PeakCapacityLimit[]>>('/peak-capacity')
+  },
+  create(data: { terminalArea: string; deviceType: string; maxConcurrent: number }) {
+    return instance.post<ApiResponse<PeakCapacityLimit>>('/peak-capacity', data)
+  },
+  update(id: number, data: { terminalArea: string; deviceType: string; maxConcurrent: number }) {
+    return instance.put<ApiResponse<PeakCapacityLimit>>(`/peak-capacity/${id}`, data)
+  },
+  delete(id: number) {
+    return instance.delete<ApiResponse<void>>(`/peak-capacity/${id}`)
   }
 }

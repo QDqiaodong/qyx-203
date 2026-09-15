@@ -31,6 +31,22 @@ export interface ChangeLog {
   changeTime: string
 }
 
+export interface PeakWindow {
+  id: number
+  name: string
+  startTime: string
+  endTime: string
+}
+
+export interface PeakCapacityLimit {
+  id: number
+  terminalArea: string
+  deviceType: string
+  maxConcurrent: number
+  currentUsage: number
+  updatedAt: string
+}
+
 export interface PageResponse<T> {
   content: T[]
   totalElements: number

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElTable, ElTableColumn, ElButton, ElSelect, ElOption, ElPagination, ElDialog, ElMessage } from 'element-plus'
+import { ElTable, ElTableColumn, ElButton, ElSelect, ElOption, ElPagination, ElDialog, ElMessage, ElTag } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { timeSlotApi, deviceApi } from '@/api'
-import type { TimeSlot, Device } from '@/types'
+import { timeSlotApi, deviceApi, peakCapacityApi } from '@/api'
+import type { TimeSlot, Device, PeakWindow } from '@/types'
 
 const router = useRouter()
 const timeSlots = ref<TimeSlot[]>([])
 const devices = ref<Device[]>([])
+const peakWindows = ref<PeakWindow[]>([])
 const loading = ref(false)
 const page = ref(0)
 const size = ref(10)
@@ -21,6 +22,24 @@ const deviceMap = computed(() => {
   devices.value.forEach(d => { map[d.id] = d })
   return map
 })
+
+// 时段的每日时间范围是否与任一高峰窗相交（仅作展示，拦截以后端为准）
+const overlapsPeak = (row: TimeSlot) => {
+  const s = row.startTime?.slice(0, 5)
+  const e = row.endTime?.slice(0, 5)
+  if (!s || !e) return false
+  return peakWindows.value.some(w => {
+    const ws = w.startTime.slice(0, 5)
+    const we = w.endTime.slice(0, 5)
+    return s < we && ws < e
+  })
+}
+
+const statusClass = (status: string) => {
+  if (status === '生效中') return 'status-active'
+  if (status === '已失效') return 'status-invalidated'
+  return 'status-inactive'
+}
 
 const loadTimeSlots = async () => {
   loading.value = true
@@ -45,6 +64,15 @@ const loadDevices = async () => {
     devices.value = res.data.data.content
   } catch {
     console.error('Failed to load devices')
+  }
+}
+
+const loadPeakWindows = async () => {
+  try {
+    const res = await peakCapacityApi.windows()
+    peakWindows.value = res.data.data
+  } catch {
+    console.error('Failed to load peak windows')
   }
 }
 
@@ -91,6 +119,7 @@ const confirmDelete = async () => {
 
 onMounted(() => {
   loadDevices()
+  loadPeakWindows()
   loadTimeSlots()
 })
 </script>
@@ -137,12 +166,18 @@ onMounted(() => {
       </ElTableColumn>
       <ElTableColumn label="时段" width="140">
         <template #default="scope">
-          {{ scope.row.startTime }} - {{ scope.row.endTime }}
+          {{ scope.row.startTime?.slice(0, 5) }} - {{ scope.row.endTime?.slice(0, 5) }}
+        </template>
+      </ElTableColumn>
+      <ElTableColumn label="高峰重叠" width="90">
+        <template #default="scope">
+          <ElTag v-if="overlapsPeak(scope.row as TimeSlot)" type="warning" size="small">高峰</ElTag>
+          <span v-else>-</span>
         </template>
       </ElTableColumn>
       <ElTableColumn prop="status" label="状态" width="80">
         <template #default="scope">
-          <span :class="scope.row.status === '生效中' ? 'status-active' : 'status-inactive'">
+          <span :class="statusClass(scope.row.status)">
             {{ scope.row.status }}
           </span>
         </template>
@@ -201,6 +236,11 @@ onMounted(() => {
 
 .status-inactive {
   color: #E53935;
+  font-weight: bold;
+}
+
+.status-invalidated {
+  color: #FB8C00;
   font-weight: bold;
 }
 </style>

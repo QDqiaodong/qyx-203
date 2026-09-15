@@ -53,16 +53,22 @@ const loadDevice = async () => {
 
 const handleSubmit = async () => {
   try {
-    if (isEdit.value && deviceId.value) {
-      await deviceApi.update(deviceId.value, form.value)
-      ElMessage.success('更新成功')
+    const res = isEdit.value && deviceId.value
+      ? await deviceApi.update(deviceId.value, form.value)
+      : await deviceApi.create(form.value)
+    if (res.data.code !== 200) {
+      ElMessage.error(res.data.message || '保存失败')
+      return
+    }
+    if (res.data.message && res.data.message !== 'success') {
+      // 调区后有尚未开始的时段被置为失效：点名提示
+      ElMessage.warning(res.data.message)
     } else {
-      await deviceApi.create(form.value)
-      ElMessage.success('创建成功')
+      ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     }
     router.push('/devices')
-  } catch {
-    ElMessage.error(isEdit.value ? '更新失败' : '创建失败')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || (isEdit.value ? '更新失败' : '创建失败'))
   }
 }
 

@@ -28,6 +28,9 @@ public class TimeSlotService {
     private DeviceService deviceService;
 
     @Autowired
+    private PeakCapacityService peakCapacityService;
+
+    @Autowired
     private ChangeLogRepository changeLogRepository;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -52,7 +55,7 @@ public class TimeSlotService {
     public TimeSlot save(TimeSlotDTO dto) {
         TimeSlot timeSlot;
         String beforeValue = null;
-        
+
         if (dto.getId() != null) {
             Optional<TimeSlot> existing = timeSlotRepository.findById(dto.getId());
             if (existing.isPresent()) {
@@ -65,18 +68,37 @@ public class TimeSlotService {
             timeSlot = new TimeSlot();
         }
 
+        LocalTime startTime = parseTime(dto.getStartTime());
+        LocalTime endTime = parseTime(dto.getEndTime());
+        LocalDate startDate = LocalDate.parse(dto.getStartDate(), DATE_FORMATTER);
+        LocalDate endDate = LocalDate.parse(dto.getEndDate(), DATE_FORMATTER);
+        if (!endTime.isAfter(startTime)) {
+            throw new IllegalArgumentException("结束时间必须晚于开始时间");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("结束日期不能早于开始日期");
+        }
+
+        Device device = deviceService.findById(dto.getDeviceId())
+                .orElseThrow(() -> new IllegalArgumentException("设备不存在"));
+
         timeSlot.setDeviceId(dto.getDeviceId());
-        timeSlot.setStartTime(LocalTime.parse(dto.getStartTime(), TIME_FORMATTER));
-        timeSlot.setEndTime(LocalTime.parse(dto.getEndTime(), TIME_FORMATTER));
-        timeSlot.setStartDate(LocalDate.parse(dto.getStartDate(), DATE_FORMATTER));
-        timeSlot.setEndDate(LocalDate.parse(dto.getEndDate(), DATE_FORMATTER));
+        timeSlot.setStartTime(startTime);
+        timeSlot.setEndTime(endTime);
+        timeSlot.setStartDate(startDate);
+        timeSlot.setEndDate(endDate);
         timeSlot.setStatus(dto.getStatus());
+
+        // 生效中的时段若在高峰窗内把该分区该类型的同时在用数顶过上限，本次保存直接拦截
+        if (PeakCapacityService.STATUS_ACTIVE.equals(dto.getStatus())) {
+            peakCapacityService.assertWithinCapacity(device, timeSlot, timeSlot.getId());
+        }
 
         TimeSlot saved = timeSlotRepository.save(timeSlot);
 
         String afterValue = formatTimeSlot(saved);
         String changeType = dto.getId() != null ? "时段调整" : "时段绑定";
-        
+
         saveChangeLog(saved.getDeviceId(), saved.getId(), changeType, beforeValue, afterValue);
 
         return saved;
@@ -92,8 +114,19 @@ public class TimeSlotService {
         }
     }
 
+    private LocalTime parseTime(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("时间不能为空");
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() == 5) {
+            return LocalTime.parse(trimmed, TIME_FORMATTER);
+        }
+        return LocalTime.parse(trimmed);
+    }
+
     private String formatTimeSlot(TimeSlot timeSlot) {
-        return String.format("%s %s-%s", 
+        return String.format("%s %s-%s",
             timeSlot.getStartDate().format(DATE_FORMATTER) + " ~ " + timeSlot.getEndDate().format(DATE_FORMATTER),
             timeSlot.getStartTime().format(TIME_FORMATTER),
             timeSlot.getEndTime().format(TIME_FORMATTER));

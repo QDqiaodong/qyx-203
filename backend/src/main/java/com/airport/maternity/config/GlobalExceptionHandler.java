@@ -1,0 +1,30 @@
+package com.airport.maternity.config;
+
+import com.airport.maternity.dto.ResponseDTO;
+import com.airport.maternity.exception.CapacityExceededException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(CapacityExceededException.class)
+    public ResponseDTO<Void> handleCapacityExceeded(CapacityExceededException e) {
+        return ResponseDTO.error(409, e.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseDTO<Void> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseDTO.error(400, e.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseDTO<Void> handleValidation(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage() == null ? "参数校验失败" : error.getDefaultMessage())
+                .orElse("参数校验失败");
+        return ResponseDTO.error(400, message);
+    }
+}

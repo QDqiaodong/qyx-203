@@ -19,8 +19,10 @@ export const deviceApi = {
   update(id: number, data: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>) {
     return instance.put<ApiResponse<Device>>(`/devices/${id}`, data)
   },
-  delete(id: number) {
-    return instance.delete<ApiResponse<void>>(`/devices/${id}`)
+  delete(id: number, force = false) {
+    return instance.delete<ApiResponse<{ totalSlots: number; invalidatedSlots: number; ongoingSlots: number; forced: boolean }>>(`/devices/${id}`, {
+      params: force ? { force: true } : {},
+    })
   }
 }
 

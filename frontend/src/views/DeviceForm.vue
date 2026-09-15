@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElMessage } from 'element-plus'
+import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElMessage, ElAlert } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { deviceApi, categoryApi } from '@/api'
 
@@ -108,6 +108,13 @@ onMounted(() => {
             <ElOption label="维护中" value="维护中" />
             <ElOption label="停用" value="停用" />
           </ElSelect>
+          <ElAlert
+            v-if="isEdit && form.status === '停用'"
+            type="warning"
+            :closable="false"
+            class="disable-tip"
+            title="停用后，该设备名下尚未结束（进行中/未开始）的「生效中」占用会立即置为「已失效」，不再出现在时段列表的正常在用口径和统计中，并逐段写入变更记录；已结束的历史时段保持原样。"
+          />
         </ElFormItem>
         <ElFormItem>
           <ElButton type="primary" @click="handleSubmit">保存</ElButton>
@@ -133,5 +140,9 @@ onMounted(() => {
   padding: 32px;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.disable-tip {
+  margin-top: 8px;
 }
 </style>

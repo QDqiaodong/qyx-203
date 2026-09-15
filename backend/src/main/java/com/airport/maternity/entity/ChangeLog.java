@@ -24,6 +24,12 @@ public class ChangeLog {
     @Column(name = "device_id", nullable = false)
     private Long deviceId;
 
+    /**
+     * 设备编号快照：设备从台账删除后，变更记录仍能对上是哪台编号的停用/删除与占用处置。
+     */
+    @Column(name = "device_code", length = 50)
+    private String deviceCode;
+
     @Column(name = "time_slot_id")
     private Long timeSlotId;
 

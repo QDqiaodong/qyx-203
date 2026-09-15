@@ -16,7 +16,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class TimeSlotService {
@@ -79,8 +82,27 @@ public class TimeSlotService {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
         }
 
-        Device device = deviceService.findById(dto.getDeviceId())
-                .orElseThrow(() -> new IllegalArgumentException("设备不存在"));
+        // 锁设备行：与设备停用/删除互斥，避免一边时段写成生效中、一边设备已停用或没了。
+        // 换绑设备时原设备行也要锁；多设备按 id 升序加锁，保证全局锁序一致、不死锁。
+        Long oldDeviceId = timeSlot.getId() != null ? timeSlot.getDeviceId() : null;
+        List<Long> deviceIdsToLock = Stream.of(oldDeviceId, dto.getDeviceId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+        Device device = null;
+        for (Long lockId : deviceIdsToLock) {
+            Device lockedDevice = deviceService.lockById(lockId);
+            if (lockId.equals(dto.getDeviceId())) {
+                device = lockedDevice;
+            }
+        }
+
+        // 停用设备名下不允许再挂生效中占用（停用瞬间存量占用已被置为失效）
+        if (PeakCapacityService.STATUS_ACTIVE.equals(dto.getStatus())
+                && DeviceService.DEVICE_STATUS_DISABLED.equals(device.getStatus())) {
+            throw new IllegalArgumentException("设备【" + device.getDeviceCode() + "】已停用，不能保存「生效中」时段");
+        }
 
         timeSlot.setDeviceId(dto.getDeviceId());
         timeSlot.setStartTime(startTime);
@@ -99,7 +121,7 @@ public class TimeSlotService {
         String afterValue = formatTimeSlot(saved);
         String changeType = dto.getId() != null ? "时段调整" : "时段绑定";
 
-        saveChangeLog(saved.getDeviceId(), saved.getId(), changeType, beforeValue, afterValue);
+        saveChangeLog(saved.getDeviceId(), device.getDeviceCode(), saved.getId(), changeType, beforeValue, afterValue);
 
         return saved;
     }
@@ -108,8 +130,11 @@ public class TimeSlotService {
     public void deleteById(Long id) {
         Optional<TimeSlot> timeSlot = timeSlotRepository.findById(id);
         if (timeSlot.isPresent()) {
-            String beforeValue = formatTimeSlot(timeSlot.get());
-            saveChangeLog(timeSlot.get().getDeviceId(), id, "时段解绑", beforeValue, null);
+            // 与设备停用/删除共用设备行锁，禁止并发时留下对不上的状态
+            Device device = deviceService.lockById(timeSlot.get().getDeviceId());
+            TimeSlot locked = timeSlotRepository.findByIdForUpdate(id).orElse(timeSlot.get());
+            String beforeValue = formatTimeSlot(locked);
+            saveChangeLog(locked.getDeviceId(), device.getDeviceCode(), id, "时段解绑", beforeValue, null);
             timeSlotRepository.deleteById(id);
         }
     }
@@ -132,9 +157,10 @@ public class TimeSlotService {
             timeSlot.getEndTime().format(TIME_FORMATTER));
     }
 
-    private void saveChangeLog(Long deviceId, Long timeSlotId, String changeType, String beforeValue, String afterValue) {
+    private void saveChangeLog(Long deviceId, String deviceCode, Long timeSlotId, String changeType, String beforeValue, String afterValue) {
         ChangeLog log = new ChangeLog();
         log.setDeviceId(deviceId);
+        log.setDeviceCode(deviceCode);
         log.setTimeSlotId(timeSlotId);
         log.setChangeType(changeType);
         log.setBeforeValue(beforeValue);
@@ -143,10 +169,14 @@ public class TimeSlotService {
         changeLogRepository.save(log);
     }
 
-    public List<Long> findDeviceIdsByTimeRange(String startTime, String endTime) {
+    /**
+     * 统计页「按时段筛选」：只取正常在用设备名下、生效中、查询日在日期范围内
+     * 且每日时段相交的占用。停用设备、已失效/已停用时段、历史时段均不命中。
+     */
+    public List<Long> findInUseDeviceIdsByTimeRange(String startTime, String endTime) {
         LocalTime start = LocalTime.parse(startTime, TIME_FORMATTER);
         LocalTime end = LocalTime.parse(endTime, TIME_FORMATTER);
-        return timeSlotRepository.findDeviceIdsByTimeRange(start, end);
+        return timeSlotRepository.findInUseDeviceIds(start, end, LocalDate.now());
     }
 
     public List<TimeSlot> findByTimeRange(String startTime, String endTime) {

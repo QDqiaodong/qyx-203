@@ -69,9 +69,17 @@ const getChangeTypeClass = (type: string) => {
     case '时段绑定': return 'type-bind'
     case '时段调整': return 'type-adjust'
     case '时段解绑': return 'type-unbind'
+    case '设备停用': return 'type-disable'
+    case '设备删除': return 'type-delete'
+    case '时段失效': return 'type-invalidated'
+    case '设备调区': return 'type-adjust'
     default: return ''
   }
 }
+
+// 设备已从台账删除时，用变更记录里的编号快照对号
+const codeOf = (row: ChangeLog) => deviceMap.value[row.deviceId]?.deviceCode || row.deviceCode || '-'
+const deviceDeleted = (row: ChangeLog) => !deviceMap.value[row.deviceId]
 
 onMounted(() => {
   loadDevices()
@@ -109,9 +117,10 @@ onMounted(() => {
     </div>
     <ElTable :data="changeLogs" :loading="loading" border style="width: 100%; margin-top: 16px;">
       <ElTableColumn prop="id" label="ID" width="60" />
-      <ElTableColumn label="设备编号" width="160">
+      <ElTableColumn label="设备编号" width="180">
         <template #default="scope">
-          {{ deviceMap[scope.row.deviceId]?.deviceCode || '-' }}
+          {{ codeOf(scope.row as ChangeLog) }}
+          <span v-if="deviceDeleted(scope.row as ChangeLog)" class="deleted-tag">已删除</span>
         </template>
       </ElTableColumn>
       <ElTableColumn label="设备类型" width="120">
@@ -126,12 +135,12 @@ onMounted(() => {
           </span>
         </template>
       </ElTableColumn>
-      <ElTableColumn prop="beforeValue" label="变更前" width="200">
+      <ElTableColumn prop="beforeValue" label="变更前" min-width="240" show-overflow-tooltip>
         <template #default="scope">
           {{ scope.row.beforeValue || '-' }}
         </template>
       </ElTableColumn>
-      <ElTableColumn prop="afterValue" label="变更后" width="200">
+      <ElTableColumn prop="afterValue" label="变更后" min-width="240" show-overflow-tooltip>
         <template #default="scope">
           {{ scope.row.afterValue || '-' }}
         </template>
@@ -181,5 +190,30 @@ onMounted(() => {
 .type-unbind {
   color: #E53935;
   font-weight: bold;
+}
+
+.type-disable {
+  color: #FB8C00;
+  font-weight: bold;
+}
+
+.type-delete {
+  color: #C62828;
+  font-weight: bold;
+}
+
+.type-invalidated {
+  color: #FB8C00;
+  font-weight: bold;
+}
+
+.deleted-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: #fff;
+  background: #9E9E9E;
+  border-radius: 4px;
 }
 </style>

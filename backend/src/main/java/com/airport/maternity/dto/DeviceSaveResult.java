@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 设备档案保存结果：调区导致部分尚未开始的时段被置为失效时，随结果返回明细。
+ * 设备档案保存结果：
+ * 设备停用或调区导致存量时段被置为失效时，随结果返回明细与原因（用于接口提示）。
  */
 @Data
 @NoArgsConstructor
@@ -18,4 +19,6 @@ public class DeviceSaveResult {
 
     private Device device;
     private List<TimeSlot> invalidatedSlots;
+    /** 时段被置失效的原因：设备停用 / 设备调区 */
+    private String reason;
 }

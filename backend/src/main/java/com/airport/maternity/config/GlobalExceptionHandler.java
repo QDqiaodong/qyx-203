@@ -2,6 +2,7 @@ package com.airport.maternity.config;
 
 import com.airport.maternity.dto.ResponseDTO;
 import com.airport.maternity.exception.CapacityExceededException;
+import com.airport.maternity.exception.DeviceInUseException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -11,6 +12,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CapacityExceededException.class)
     public ResponseDTO<Void> handleCapacityExceeded(CapacityExceededException e) {
+        return ResponseDTO.error(409, e.getMessage());
+    }
+
+    @ExceptionHandler(DeviceInUseException.class)
+    public ResponseDTO<Void> handleDeviceInUse(DeviceInUseException e) {
         return ResponseDTO.error(409, e.getMessage());
     }
 

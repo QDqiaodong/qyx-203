@@ -28,7 +28,7 @@ public class StatisticsController {
     public ResponseDTO<List<Device>> findByTimeRange(
             @RequestParam String startTime,
             @RequestParam String endTime) {
-        List<Long> deviceIds = timeSlotService.findDeviceIdsByTimeRange(startTime, endTime);
+        List<Long> deviceIds = timeSlotService.findInUseDeviceIdsByTimeRange(startTime, endTime);
         List<Device> devices = deviceIds.stream()
                 .map(deviceService::findById)
                 .filter(java.util.Optional::isPresent)

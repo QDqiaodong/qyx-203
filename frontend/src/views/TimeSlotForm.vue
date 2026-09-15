@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElForm, ElFormItem, ElSelect, ElOption, ElDatePicker, ElTimePicker, ElButton, ElMessage, ElAlert } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { timeSlotApi, deviceApi, peakCapacityApi } from '@/api'
@@ -24,6 +24,12 @@ const peakWindows = ref<PeakWindow[]>([])
 const submitting = ref(false)
 
 const fmtTime = (t: string) => (t ? t.slice(0, 5) : '')
+
+// 选中的设备是否已停用（停用设备不能再挂生效中占用）
+const deviceDisabled = computed(() => {
+  const d = devices.value.find(x => x.id === form.value.deviceId)
+  return !!d && d.status === '停用' && form.value.status === '生效中'
+})
 
 const loadDevices = async () => {
   try {
@@ -66,6 +72,10 @@ const loadTimeSlot = async () => {
 
 const handleSubmit = async () => {
   if (submitting.value) return
+  if (deviceDisabled.value) {
+    ElMessage.error('该设备已停用，不能保存「生效中」时段')
+    return
+  }
   submitting.value = true
   try {
     const res = isEdit.value && timeSlotId.value
@@ -119,8 +129,15 @@ onMounted(() => {
       <ElForm :model="form" label-width="120px" style="max-width: 600px;">
         <ElFormItem label="选择设备" required>
           <ElSelect v-model="form.deviceId" placeholder="请选择设备" style="width: 100%;">
-            <ElOption v-for="d in devices" :key="d.id" :label="d.deviceCode + ' - ' + d.deviceType + ' (' + d.terminalArea + ')'" :value="d.id" />
+            <ElOption
+              v-for="d in devices"
+              :key="d.id"
+              :label="d.status !== '正常' ? d.deviceCode + ' - ' + d.deviceType + '（' + d.status + '）' : d.deviceCode + ' - ' + d.deviceType + ' (' + d.terminalArea + ')'"
+              :value="d.id"
+              :disabled="d.status === '停用'"
+            />
           </ElSelect>
+          <div v-if="deviceDisabled" class="device-disabled-tip">该设备已停用，不能再保存「生效中」时段。</div>
         </ElFormItem>
         <ElFormItem label="日期范围" required>
           <ElDatePicker
@@ -192,5 +209,11 @@ onMounted(() => {
 .peak-tip {
   margin-bottom: 20px;
   max-width: 600px;
+}
+
+.device-disabled-tip {
+  color: #E53935;
+  font-size: 12px;
+  margin-top: 4px;
 }
 </style>

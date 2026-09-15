@@ -35,6 +35,10 @@ const overlapsPeak = (row: TimeSlot) => {
   })
 }
 
+const deviceLabel = (d: Device) => d.status && d.status !== '正常'
+  ? `${d.deviceCode} - ${d.deviceType}（${d.status}）`
+  : `${d.deviceCode} - ${d.deviceType}`
+
 const statusClass = (status: string) => {
   if (status === '生效中') return 'status-active'
   if (status === '已失效') return 'status-invalidated'
@@ -138,15 +142,20 @@ onMounted(() => {
         clearable
         @change="handleSearch"
       >
-        <ElOption v-for="d in devices" :key="d.id" :label="d.deviceCode + ' - ' + d.deviceType" :value="d.id" />
+        <ElOption v-for="d in devices" :key="d.id" :label="deviceLabel(d)" :value="d.id" />
       </ElSelect>
       <ElButton type="primary" @click="handleSearch">搜索</ElButton>
     </div>
     <ElTable :data="timeSlots" :loading="loading" border style="width: 100%; margin-top: 16px;">
       <ElTableColumn prop="id" label="ID" width="60" />
-      <ElTableColumn label="设备编号" width="160">
+      <ElTableColumn label="设备编号" width="170">
         <template #default="scope">
           {{ deviceMap[scope.row.deviceId]?.deviceCode || '-' }}
+          <ElTag
+            v-if="deviceMap[scope.row.deviceId] && deviceMap[scope.row.deviceId].status !== '正常'"
+            type="danger"
+            size="small"
+          >{{ deviceMap[scope.row.deviceId].status }}</ElTag>
         </template>
       </ElTableColumn>
       <ElTableColumn label="设备类型" width="120">

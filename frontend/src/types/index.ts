@@ -23,6 +23,7 @@ export interface TimeSlot {
 export interface ChangeLog {
   id: number
   deviceId: number
+  deviceCode?: string | null
   timeSlotId: number | null
   changeType: string
   beforeValue: string | null

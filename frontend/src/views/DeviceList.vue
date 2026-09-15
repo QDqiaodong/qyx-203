@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElTable, ElTableColumn, ElButton, ElSelect, ElOption, ElPagination, ElDialog, ElMessage } from 'element-plus'
+import { ElTable, ElTableColumn, ElButton, ElSelect, ElOption, ElPagination, ElDialog, ElMessage, ElCheckbox, ElAlert } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { deviceApi, categoryApi } from '@/api'
 import type { Device } from '@/types'
@@ -15,8 +15,13 @@ const terminalArea = ref('')
 const deviceType = ref('')
 const terminalAreas = ref<string[]>([])
 const deviceTypes = ref<string[]>([])
+
+// 删除弹窗状态：普通确认 / 进行中占用被拦截
 const showDeleteDialog = ref(false)
-const deleteId = ref<number | null>(null)
+const deleteTarget = ref<Device | null>(null)
+const blockedMessage = ref('')
+const forceDelete = ref(false)
+const deleting = ref(false)
 
 const loadDevices = async () => {
   loading.value = true
@@ -73,21 +78,58 @@ const handleEdit = (id: number) => {
   router.push(`/devices/edit/${id}`)
 }
 
-const handleDelete = (id: number) => {
-  deleteId.value = id
+const handleDelete = (row: Device) => {
+  deleteTarget.value = row
+  blockedMessage.value = ''
+  forceDelete.value = false
   showDeleteDialog.value = true
 }
 
+const closeDeleteDialog = () => {
+  if (deleting.value) return
+  showDeleteDialog.value = false
+  deleteTarget.value = null
+  blockedMessage.value = ''
+  forceDelete.value = false
+}
+
 const confirmDelete = async () => {
-  if (deleteId.value === null) return
+  if (deleteTarget.value === null || deleting.value) return
+  deleting.value = true
   try {
-    await deviceApi.delete(deleteId.value)
-    ElMessage.success('删除成功')
+    const res = await deviceApi.delete(deleteTarget.value.id, forceDelete.value)
+    // 强制删除成功时后端返回带走了多少段占用
+    ElMessage.success(res.data.message || '删除成功：设备与其名下时段已一并清除，未结束占用已置失效并写入变更记录')
     showDeleteDialog.value = false
+    deleteTarget.value = null
+    // 删掉的可能是当前页最后一条，退回上一页避免空页
+    if (devices.value.length === 1 && page.value > 0) {
+      page.value -= 1
+    }
     loadDevices()
-  } catch {
-    ElMessage.error('删除失败')
+  } catch (e: any) {
+    const code = e?.response?.data?.code
+    const message = e?.response?.data?.message || '删除失败'
+    if (code === 409) {
+      // 有进行中的占用：留在弹窗里点名展示，等待用户确认强制删除
+      blockedMessage.value = message
+      forceDelete.value = false
+    } else if (code === 404) {
+      ElMessage.error('设备不存在或已被删除，列表即将刷新')
+      showDeleteDialog.value = false
+      loadDevices()
+    } else {
+      ElMessage.error(message)
+    }
+  } finally {
+    deleting.value = false
   }
+}
+
+const statusClass = (status: string) => {
+  if (status === '正常') return 'status-normal'
+  if (status === '停用') return 'status-disabled'
+  return 'status-abnormal'
 }
 
 onMounted(() => {
@@ -130,7 +172,7 @@ onMounted(() => {
       <ElTableColumn prop="terminalArea" label="航站楼分区" width="140" />
       <ElTableColumn prop="status" label="状态" width="80">
         <template #default="scope">
-          <span :class="scope.row.status === '正常' ? 'status-normal' : 'status-abnormal'">
+          <span :class="statusClass((scope.row as Device).status)">
             {{ scope.row.status }}
           </span>
         </template>
@@ -139,7 +181,7 @@ onMounted(() => {
       <ElTableColumn label="操作" width="160" fixed="right">
         <template #default="scope">
           <ElButton type="primary" size="small" @click="handleEdit(scope.row.id)">编辑</ElButton>
-          <ElButton type="danger" size="small" @click="handleDelete(scope.row.id)">删除</ElButton>
+          <ElButton type="danger" size="small" @click="handleDelete(scope.row as Device)">删除</ElButton>
         </template>
       </ElTableColumn>
     </ElTable>
@@ -154,11 +196,48 @@ onMounted(() => {
         @size-change="handleSizeChange"
       />
     </div>
-    <ElDialog title="确认删除" v-model="showDeleteDialog" @close="showDeleteDialog = false">
-      <p>确定要删除该设备吗？此操作不可撤销。</p>
+
+    <ElDialog
+      :title="blockedMessage ? '删除被拦截：存在进行中的占用' : '确认删除'"
+      v-model="showDeleteDialog"
+      width="560px"
+      @close="closeDeleteDialog"
+    >
+      <template v-if="!blockedMessage">
+        <p>确定要删除设备【{{ deleteTarget?.deviceCode }}】吗？</p>
+        <p class="delete-tip">
+          删除会在同一事务内清掉该设备名下全部时段（不保留孤儿时段）；
+          尚未结束的生效中占用会先置为「已失效」，本次停用/删除带走的占用会逐段写入变更记录。
+        </p>
+        <ElAlert
+          v-if="deleteTarget?.status === '停用'"
+          type="info"
+          :closable="false"
+          title="该设备已停用，其名下尚未结束的占用此前已随停用置为失效。"
+          style="margin-top: 12px;"
+        />
+      </template>
+      <template v-else>
+        <ElAlert type="error" :closable="false" :title="blockedMessage" style="margin-bottom: 16px;" />
+        <ElCheckbox v-model="forceDelete">
+          我知晓以上占用正在进行中，仍要强制删除（先全部置为失效并写入变更，再删除设备与其名下时段）
+        </ElCheckbox>
+      </template>
       <template #footer>
-        <ElButton @click="showDeleteDialog = false">取消</ElButton>
-        <ElButton type="danger" @click="confirmDelete">确认删除</ElButton>
+        <ElButton :disabled="deleting" @click="closeDeleteDialog">取消</ElButton>
+        <ElButton
+          v-if="blockedMessage"
+          type="danger"
+          :loading="deleting"
+          :disabled="!forceDelete"
+          @click="confirmDelete"
+        >强制删除</ElButton>
+        <ElButton
+          v-else
+          type="danger"
+          :loading="deleting"
+          @click="confirmDelete"
+        >确认删除</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -188,7 +267,19 @@ onMounted(() => {
 }
 
 .status-abnormal {
+  color: #FB8C00;
+  font-weight: bold;
+}
+
+.status-disabled {
   color: #E53935;
   font-weight: bold;
+}
+
+.delete-tip {
+  color: #999;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 8px;
 }
 </style>

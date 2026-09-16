@@ -34,6 +34,9 @@ public class TimeSlotService {
     private PeakCapacityService peakCapacityService;
 
     @Autowired
+    private OpeningInspectionService openingInspectionService;
+
+    @Autowired
     private ChangeLogRepository changeLogRepository;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -102,6 +105,13 @@ public class TimeSlotService {
         if (PeakCapacityService.STATUS_ACTIVE.equals(dto.getStatus())
                 && DeviceService.DEVICE_STATUS_DISABLED.equals(device.getStatus())) {
             throw new IllegalArgumentException("设备【" + device.getDeviceCode() + "】已停用，不能保存「生效中」时段");
+        }
+
+        // 开班巡检闸口：当天最近一次巡检不是「通过」（未巡检/巡检不通过）时，
+        // 不能再给它新挂「生效中」时段。设备行锁已持有，与并发的巡检登记互斥，
+        // 不会出现「巡检还是未通过、时段已写成生效中」。
+        if (PeakCapacityService.STATUS_ACTIVE.equals(dto.getStatus())) {
+            openingInspectionService.assertPassedToday(device);
         }
 
         timeSlot.setDeviceId(dto.getDeviceId());

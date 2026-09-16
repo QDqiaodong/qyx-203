@@ -2,6 +2,7 @@ package com.airport.maternity;
 
 import com.airport.maternity.dto.DeviceDTO;
 import com.airport.maternity.dto.DeviceSaveResult;
+import com.airport.maternity.dto.OpeningInspectionDTO;
 import com.airport.maternity.dto.PeakCapacityLimitDTO;
 import com.airport.maternity.dto.PeakCapacityStatusDTO;
 import com.airport.maternity.dto.TimeSlotDTO;
@@ -12,6 +13,7 @@ import com.airport.maternity.exception.CapacityExceededException;
 import com.airport.maternity.repository.ChangeLogRepository;
 import com.airport.maternity.repository.TimeSlotRepository;
 import com.airport.maternity.service.DeviceService;
+import com.airport.maternity.service.OpeningInspectionService;
 import com.airport.maternity.service.PeakCapacityService;
 import com.airport.maternity.service.TimeSlotService;
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,9 @@ class PeakCapacityIntegrationTest {
     private ChangeLogRepository changeLogRepository;
 
     @Autowired
+    private OpeningInspectionService openingInspectionService;
+
+    @Autowired
     private MockMvc mockMvc;
 
     private static final DateTimeFormatter DF = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -75,7 +80,20 @@ class PeakCapacityIntegrationTest {
         dto.setDeviceType(type);
         dto.setTerminalArea(area);
         dto.setStatus("正常");
-        return deviceService.save(dto).getDevice();
+        Device device = deviceService.save(dto).getDevice();
+        // 新规：当天最近一次开班巡检「通过」后才允许挂「生效中」时段
+        passInspection(device.getId());
+        return device;
+    }
+
+    private void passInspection(Long deviceId) {
+        OpeningInspectionDTO dto = new OpeningInspectionDTO();
+        dto.setDeviceId(deviceId);
+        dto.setInspector("早班保洁");
+        dto.setResult("通过");
+        dto.setTowelShortage(false);
+        dto.setPaperShortage(false);
+        openingInspectionService.save(dto);
     }
 
     private TimeSlotDTO slotDto(Long deviceId, LocalDate startDate, LocalDate endDate,

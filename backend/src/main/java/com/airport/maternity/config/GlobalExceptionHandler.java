@@ -3,6 +3,7 @@ package com.airport.maternity.config;
 import com.airport.maternity.dto.ResponseDTO;
 import com.airport.maternity.exception.CapacityExceededException;
 import com.airport.maternity.exception.DeviceInUseException;
+import com.airport.maternity.exception.InspectionNotPassedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,6 +18,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DeviceInUseException.class)
     public ResponseDTO<Void> handleDeviceInUse(DeviceInUseException e) {
+        return ResponseDTO.error(409, e.getMessage());
+    }
+
+    @ExceptionHandler(InspectionNotPassedException.class)
+    public ResponseDTO<Void> handleInspectionNotPassed(InspectionNotPassedException e) {
         return ResponseDTO.error(409, e.getMessage());
     }
 

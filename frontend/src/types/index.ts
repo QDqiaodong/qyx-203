@@ -39,6 +39,31 @@ export interface PeakWindow {
   endTime: string
 }
 
+/** 体温枪校准登记台账行 */
+export interface CalibrationRecord {
+  id: number
+  deviceId: number
+  deviceCode?: string | null
+  calibrator: string
+  result: string
+  remark?: string | null
+  dutyDate: string
+  createdAt: string
+}
+
+/** 当班可用名单行 */
+export interface DutyRosterEntry {
+  id: number
+  deviceId: number
+  deviceCode?: string | null
+  dutyDate: string
+  status: string
+  removeReason?: string | null
+  calibrationId?: number | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PeakCapacityLimit {
   id: number
   terminalArea: string

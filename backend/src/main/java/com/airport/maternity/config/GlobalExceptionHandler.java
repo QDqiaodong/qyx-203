@@ -1,6 +1,8 @@
 package com.airport.maternity.config;
 
 import com.airport.maternity.dto.ResponseDTO;
+import com.airport.maternity.exception.CalibrationConflictException;
+import com.airport.maternity.exception.CalibrationNotPassedException;
 import com.airport.maternity.exception.CapacityExceededException;
 import com.airport.maternity.exception.DeviceInUseException;
 import com.airport.maternity.exception.InspectionNotPassedException;
@@ -23,6 +25,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InspectionNotPassedException.class)
     public ResponseDTO<Void> handleInspectionNotPassed(InspectionNotPassedException e) {
+        return ResponseDTO.error(409, e.getMessage());
+    }
+
+    /** 同枪同当班日已有先落库的校准结论：后到的不能改先写的 */
+    @ExceptionHandler(CalibrationConflictException.class)
+    public ResponseDTO<Void> handleCalibrationConflict(CalibrationConflictException e) {
+        return ResponseDTO.error(409, e.getMessage());
+    }
+
+    /** 校准不通过的枪仍想列入当班可用名单：拦下 */
+    @ExceptionHandler(CalibrationNotPassedException.class)
+    public ResponseDTO<Void> handleCalibrationNotPassed(CalibrationNotPassedException e) {
         return ResponseDTO.error(409, e.getMessage());
     }
 

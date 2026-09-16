@@ -29,8 +29,8 @@ public class CategoryTemplateService {
 
     public JSONObject initCategoryTemplate() {
         JSONObject template = new JSONObject();
-        template.put("deviceTypes", Arrays.asList("母婴室", "哺乳室", "婴儿护理台", "育婴室"));
-        template.put("terminalAreas", Arrays.asList("T1航站楼", "T2航站楼", "T3航站楼", "国际出发区", "国内到达区"));
+        template.put("deviceTypes", Arrays.asList("母婴室", "哺乳室", "婴儿护理台", "育婴室", "体温枪"));
+        template.put("terminalAreas", Arrays.asList("T1航站楼", "T2航站楼", "T3航站楼", "国际出发区", "国内到达区", "T1值机岛", "T2值机岛"));
         redisTemplate.opsForValue().set(CACHE_KEY, template.toJSONString(), EXPIRATION_MINUTES, TimeUnit.MINUTES);
         return template;
     }

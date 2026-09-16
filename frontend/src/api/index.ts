@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Device, TimeSlot, ChangeLog, PeakWindow, PeakCapacityLimit, PageResponse, ApiResponse } from '@/types'
+import type { Device, TimeSlot, ChangeLog, PeakWindow, PeakCapacityLimit, CalibrationRecord, DutyRosterEntry, PageResponse, ApiResponse } from '@/types'
 
 const instance = axios.create({
   baseURL: '/api',
@@ -86,5 +86,29 @@ export const peakCapacityApi = {
   },
   delete(id: number) {
     return instance.delete<ApiResponse<void>>(`/peak-capacity/${id}`)
+  }
+}
+
+export const calibrationApi = {
+  list(params: { page: number; size: number; deviceId?: number; dutyDate?: string }) {
+    return instance.get<ApiResponse<PageResponse<CalibrationRecord>>>('/calibrations', { params })
+  },
+  create(data: { deviceId: number; calibrator: string; result: string; remark?: string }) {
+    return instance.post<ApiResponse<CalibrationRecord>>('/calibrations', data)
+  }
+}
+
+export const dutyRosterApi = {
+  /** 默认只返回当班可用；all=true 连撤下留痕一起返回 */
+  list(params: { dutyDate?: string; all?: boolean }) {
+    return instance.get<ApiResponse<DutyRosterEntry[]>>('/duty-roster', { params })
+  },
+  add(data: { deviceId: number; operator?: string }) {
+    return instance.post<ApiResponse<DutyRosterEntry>>('/duty-roster', data)
+  },
+  remove(id: number, reason?: string) {
+    return instance.put<ApiResponse<DutyRosterEntry>>(`/duty-roster/${id}/remove`, null, {
+      params: reason ? { reason } : {}
+    })
   }
 }

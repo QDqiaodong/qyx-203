@@ -7,6 +7,7 @@ import TimeSlotForm from '@/views/TimeSlotForm.vue'
 import ChangeLogList from '@/views/ChangeLogList.vue'
 import Statistics from '@/views/Statistics.vue'
 import PeakCapacityList from '@/views/PeakCapacityList.vue'
+import CalibrationView from '@/views/CalibrationView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +20,7 @@ const router = createRouter({
     { path: '/time-slots/allocate', component: TimeSlotForm },
     { path: '/time-slots/edit/:id', component: TimeSlotForm },
     { path: '/peak-capacity', component: PeakCapacityList },
+    { path: '/calibrations', component: CalibrationView },
     { path: '/change-logs', component: ChangeLogList },
     { path: '/statistics', component: Statistics },
   ]

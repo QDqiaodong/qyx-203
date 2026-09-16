@@ -5,10 +5,12 @@ import com.airport.maternity.dto.DeviceDeleteResult;
 import com.airport.maternity.dto.DeviceSaveResult;
 import com.airport.maternity.entity.ChangeLog;
 import com.airport.maternity.entity.Device;
+import com.airport.maternity.entity.DutyRosterEntry;
 import com.airport.maternity.entity.TimeSlot;
 import com.airport.maternity.exception.DeviceInUseException;
 import com.airport.maternity.repository.ChangeLogRepository;
 import com.airport.maternity.repository.DeviceRepository;
+import com.airport.maternity.repository.DutyRosterEntryRepository;
 import com.airport.maternity.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -46,6 +48,9 @@ public class DeviceService {
 
     @Autowired
     private ChangeLogRepository changeLogRepository;
+
+    @Autowired
+    private DutyRosterEntryRepository dutyRosterEntryRepository;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -131,6 +136,8 @@ public class DeviceService {
             // 停用：名下尚未结束（进行中 + 未开始）的生效中占用全部置为失效，
             // 不能再按正常在用出现在时段列表和统计里；已结束的历史时段不动
             invalidated = invalidateOpenSlots(saved, REASON_DISABLED);
+            // 当天当班可用名单里若还挂着这把枪，同事务撤下，不能让停用枪继续当班
+            removeFromTodayRoster(saved, "设备停用");
             saveChangeLog(saved.getId(), null, "设备停用",
                     oldStatus + "（名下生效中占用）",
                     "停用；名下 " + invalidated.size() + " 段尚未结束的占用已置为失效");
@@ -183,6 +190,9 @@ public class DeviceService {
                     "已失效（设备删除：" + device.getDeviceCode() + "）");
         }
 
+        // 当班可用名单里今天还挂着的，同事务撤下；名单行留痕（带编号快照），不当班即可
+        removeFromTodayRoster(device, "设备删除：" + device.getDeviceCode());
+
         // 一条汇总记录，保证变更记录能对上这次删除带走了哪些占用
         saveChangeLog(id, null, "设备删除",
                 String.format("设备编号 %s（%s · %s）；名下共 %d 段时段，其中 %d 段未结束占用已置为失效",
@@ -222,6 +232,20 @@ public class DeviceService {
 
     public List<Device> findAllDevices() {
         return deviceRepository.findAll();
+    }
+
+    /**
+     * 设备停用/删除时，把今天仍挂在当班可用名单里的行同事务撤下。
+     * 名单行保留为「已撤下」留痕（带枪号快照），与设备删除同事务，不会让一把没了/停用的枪继续当班。
+     */
+    private void removeFromTodayRoster(Device device, String reason) {
+        Optional<DutyRosterEntry> onDuty = dutyRosterEntryRepository
+                .findByDeviceIdAndDutyDateAndStatus(device.getId(), LocalDate.now(), DutyRosterEntry.STATUS_ON_DUTY);
+        onDuty.ifPresent(entry -> {
+            entry.setStatus(DutyRosterEntry.STATUS_REMOVED);
+            entry.setRemoveReason(reason);
+            dutyRosterEntryRepository.save(entry);
+        });
     }
 
     private String formatTimeSlot(TimeSlot timeSlot) {
